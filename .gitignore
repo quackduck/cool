@@ -1,0 +1,4 @@
+*.DS_Store
+__debug_bin
+/cool
+.idea
