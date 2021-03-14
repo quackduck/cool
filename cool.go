@@ -13,12 +13,13 @@ import (
 
 	// "github.com/caseymrm/go-smc"
 	"github.com/fatih/color"
-	_ "github.com/guptarohit/asciigraph"
+	ag "github.com/guptarohit/asciigraph"
 )
 
 var (
 	version = "dev"
 	helpMsg = ``
+	chart   = false
 )
 
 func main() {
@@ -28,6 +29,12 @@ func main() {
 	}
 	if hasOption, _ := argsHaveOption("version", "v"); hasOption {
 		fmt.Println("Cool " + version)
+		return
+	}
+	if hasOption, i := argsHaveOption("chart", "c"); hasOption {
+		chart = !chart
+		os.Args = removeKeepOrder(os.Args, i)
+		main()
 		return
 	}
 	currentUser, err := user.Current()
@@ -61,12 +68,40 @@ func cool(target int) {
 	t := getTemp()
 	var s int
 
+	var tplot, fplot []float64
 	setFanSpeed(1200 + 100*(int(t)-target)) // quickly set it initally
 	for ; ; time.Sleep(time.Second * 5) {   // fine tune
 		s = getFanSpeed()
 		t = getTemp()
 
-		fmt.Printf("%v %8v RPM\n", color.YellowString("%.1f C", t), s)
+		if !chart {
+			fmt.Printf("%v %8v RPM\n", color.YellowString("%.1f C", t), s)
+		} else {
+			ag.Clear()
+			fmt.Println("Cooling to", color.YellowString("%v C", target))
+			// fmt.Println("\033c") // clear screen
+
+			tplot = append(tplot, t)
+			for len(tplot) > 99 { // window width - 1
+				tplot = removeKeepOrderFloat(tplot, 0)
+			}
+			if !(tplot[0] == 50) {
+				tplot = append([]float64{50}, tplot...) // get 50 value so plot starts from 50
+			}
+			fmt.Println(ag.Plot(tplot, ag.Height(8), ag.Caption("Temperature (C)")))
+
+			// fmt.Println()
+
+			fplot = append(fplot, float64(s))
+			for len(fplot) > 99 { // window width - 1
+				fplot = removeKeepOrderFloat(fplot, 0)
+			}
+			if !(fplot[0] == 1200) {
+				fplot = append([]float64{1200}, fplot...) // get 1200 value so plot scales from 1200
+			}
+			fmt.Println(ag.Plot(fplot, ag.Height(8), ag.Caption("Fan speed (RPM)")))
+			fmt.Printf("Now at %v, %v RPM\n", color.YellowString("%.1f C", t), s)
+		}
 		setFanSpeed(s + 10*(int(t)-target)) // set current to current + 10 times the difference in temps. This will automatically correct when temp is too low.
 	}
 }
@@ -87,9 +122,9 @@ func getFanSpeed() int {
 	return int(s)
 }
 
-// getTemp returns the value of the SMC's CPU PECI sensor (Celsius)
+// getTemp returns the value of the SMC's CPU 1 sensor (Celsius)
 func getTemp() float64 {
-	t, _ := strconv.ParseFloat(getKey("TCXC"), 64) // PECI is especially for fan control https://en.wikipedia.org/wiki/Platform_Environment_Control_Interface. However, this seems to report the actual temp.
+	t, _ := strconv.ParseFloat(getKey("TC0E"), 64)
 	return t
 }
 
@@ -127,4 +162,12 @@ func handleErr(err error) {
 
 func handleErrStr(str string) {
 	_, _ = fmt.Fprintln(os.Stderr, color.RedString("error: ")+str)
+}
+
+func removeKeepOrder(s []string, i int) []string {
+	return append(s[:i], s[i+1:]...)
+}
+
+func removeKeepOrderFloat(s []float64, i int) []float64 {
+	return append(s[:i], s[i+1:]...)
 }
