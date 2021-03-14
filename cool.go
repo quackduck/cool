@@ -22,11 +22,6 @@ var (
 )
 
 func main() {
-	if len(os.Args) == 1 {
-		handleErrStr("too few arguments")
-		fmt.Println(helpMsg)
-		return
-	}
 	if hasOption, _ := argsHaveOption("help", "h"); hasOption {
 		fmt.Println(helpMsg)
 		return
@@ -43,6 +38,9 @@ func main() {
 		handleErrStr("Setting fan values needs root permissions. Try running with sudo.")
 		return
 	}
+	if len(os.Args) == 1 {
+		cool(70)
+	}
 	temp, err := strconv.Atoi(os.Args[1])
 	if err != nil {
 		handleErr(err)
@@ -52,6 +50,7 @@ func main() {
 }
 
 func cool(target int) {
+	fmt.Println("Cooling to", color.YellowString("%v C", target))
 	c := make(chan os.Signal)
 	signal.Notify(c, os.Interrupt, os.Kill, syscall.SIGTERM)
 	go func() {
@@ -66,18 +65,10 @@ func cool(target int) {
 	for ; ; time.Sleep(time.Second * 5) {   // fine tune
 		s = getFanSpeed()
 		t = getTemp()
-		fmt.Printf("%.1f C %8v RPM\n", t, s)
+
+		fmt.Printf("%v %8v RPM\n", color.YellowString("%.1f C", t), s)
 		setFanSpeed(s + 10*(int(t)-target)) // set current to current + 10 times the difference in temps. This will automatically correct when temp is too low.
 	}
-	//// at this point we've made it cool enough, so reduce noise and try to lower rpm
-	//for t := getTemp(); t < float64(target); t = getTemp() {
-	//	fmt.Printf("%.1f C %8v RPM\n", t, s)
-	//	if s < 6500 {
-	//		setFanSpeed(s - 50)
-	//	}
-	//	s = getFanSpeed()
-	//	time.Sleep(time.Second * 5)
-	//}
 }
 
 func setFanSpeed(minSpeed int) {
