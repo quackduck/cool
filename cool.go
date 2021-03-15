@@ -2,13 +2,14 @@ package main
 
 import (
 	"fmt"
+	"github.com/muesli/termenv"
+	"math"
 	"os"
 	"os/exec"
 	"os/signal"
 	"os/user"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -21,7 +22,7 @@ import (
 var (
 	version = "dev"
 	helpMsg = ``
-	chart   = false
+	chart   = true
 )
 
 func main() {
@@ -33,8 +34,8 @@ func main() {
 		fmt.Println("Cool " + version)
 		return
 	}
-	if hasOption, i := argsHaveOption("chart", "c"); hasOption {
-		chart = !chart
+	if hasOption, i := argsHaveOption("no-chart", "c"); hasOption {
+		chart = false
 		os.Args = removeKeepOrder(os.Args, i)
 		main()
 		return
@@ -50,7 +51,7 @@ func main() {
 	if len(os.Args) == 1 {
 		cool(75)
 	}
-	temp, err := strconv.Atoi(os.Args[1])
+	temp, err := strconv.ParseFloat(os.Args[1], 32)
 	if err != nil {
 		handleErr(err)
 		return
@@ -58,48 +59,82 @@ func main() {
 	cool(temp)
 }
 
-func cool(target int) {
-	fmt.Println("Cooling to", color.YellowString("%v C", target))
+func cool(target float64) {
+	//if target > 100 {
+	//	target = 100
+	//}
+	//if target < 20 { // sane limits
+	//	target = 20
+	//}
+
+	// Init:
+	if !chart {
+		fmt.Println("Cooling to", color.YellowString("%v C", target))
+	} else {
+		termenv.AltScreen()
+		termenv.HideCursor()
+	}
+	setupInterrupt()
+	var (
+		speed       int
+		tplot       []float64
+		splot       = []float64{1200} // start at default
+		size        ts.Size
+		temp        = getTemp()
+		printedTime = false
+		g           = color.New(color.FgHiGreen)
+		start       = time.Now()
+	)
+
+	setFanSpeed(1200 + int(math.Round(150*(temp-target)))) // quickly set it at the start
+	for ; ; time.Sleep(time.Second * 2) {                  // fine tuning
+		speed = getFanSpeed()
+		temp = getTemp()
+
+		if chart {
+			size, _ = ts.GetSize()
+			termenv.ClearScreen()
+			fmt.Println("Target:", color.YellowString("%v C", target))
+			// fmt.Println()
+
+			tplot = append(tplot, temp)
+			fmt.Println(ag.Plot(tplot, ag.Height((size.Row()/2)-2-2), ag.Width(size.Col()-7), ag.Caption("Temperature (C)")))
+
+			splot = append(splot, float64(speed))
+			fmt.Println(ag.Plot(splot, ag.Height((size.Row()/2)-2-2), ag.Width(size.Col()-7), ag.Offset(4), ag.Caption("Fan speed (RPM)")))
+
+			fmt.Printf("Now at %v, %v RPM\n", color.YellowString("%.1f C", temp), speed)
+			if math.Round(target) == math.Round(temp) {
+				g.Print("At target")
+				if !printedTime {
+					g.Print(" in " + time.Since(start).Round(time.Second).String())
+					printedTime = true
+				}
+				g.Print("!")
+			} else if target > temp {
+				color.New(color.FgCyan).Print("Cooler than target!")
+			} else {
+				color.New(color.FgRed).Print("Hotter than target")
+			}
+		} else {
+			fmt.Printf("%v %8v RPM\n", color.YellowString("%.1f C", temp), speed)
+		}
+		setFanSpeed(speed + int(math.Round(temp-float64(target)))) // set current to current + the difference in temps. This will automatically correct when temp is too low.
+	}
+}
+
+func setupInterrupt() {
 	c := make(chan os.Signal)
 	signal.Notify(c, os.Interrupt, os.Kill, syscall.SIGTERM)
 	go func() {
 		<-c
 		setFanSpeed(1200) // default min fan speed
-		exitAlt()
+		if chart {
+			termenv.ExitAltScreen()
+			termenv.ShowCursor()
+		}
 		os.Exit(0)
 	}()
-	var s int
-	altscr := sync.Once{}
-	var tplot, splot []float64
-	splot = append(splot, float64(1200)) // scale from 1200
-	var size ts.Size
-
-	t := getTemp()
-	setFanSpeed(1200 + 100*(int(t)-target)) // quickly set it initally
-	for ; ; time.Sleep(time.Second * 2) {   // fine tune
-		s = getFanSpeed()
-		t = getTemp()
-		if !chart {
-			fmt.Printf("%v %8v RPM\n", color.YellowString("%.1f C", t), s)
-		} else {
-			size, _ = ts.GetSize()
-			altscr.Do(func() {
-				//fmt.Print("\033[?1049h") // enter alt screen
-				enterAlt()
-			})
-
-			ag.Clear()
-			fmt.Println("Cooling to", color.YellowString("%v C", target))
-			fmt.Println()
-			tplot = append(tplot, t)
-			fmt.Println(ag.Plot(tplot, ag.Height((size.Row()/2)-1-2), ag.Width(size.Col()-7), ag.Caption("Temperature (C)")))
-
-			splot = append(splot, float64(s))
-			fmt.Println(ag.Plot(splot, ag.Height((size.Row()/2)-1-2), ag.Width(size.Col()-7), ag.Offset(4), ag.Caption("Fan speed (RPM)")))
-			fmt.Printf("Now at %v, %v RPM\n", color.YellowString("%.1f C", t), s)
-		}
-		setFanSpeed(s + 4*(int(t)-target)) // set current to current + 4 times the difference in temps. This will automatically correct when temp is too low.
-	}
 }
 
 func setFanSpeed(minSpeed int) {
