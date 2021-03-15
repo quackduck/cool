@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/muesli/termenv"
 	"math"
 	"os"
 	"os/exec"
@@ -13,9 +12,9 @@ import (
 	"syscall"
 	"time"
 
-	// "github.com/caseymrm/go-smc"
 	"github.com/fatih/color"
 	ag "github.com/guptarohit/asciigraph"
+	"github.com/muesli/termenv"
 	"github.com/olekukonko/ts"
 )
 
