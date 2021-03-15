@@ -48,7 +48,7 @@ func main() {
 		return
 	}
 	if len(os.Args) == 1 {
-		cool(70)
+		cool(75)
 	}
 	temp, err := strconv.Atoi(os.Args[1])
 	if err != nil {
@@ -72,7 +72,7 @@ func cool(target int) {
 	altscr := sync.Once{}
 	var tplot, splot []float64
 	splot = append(splot, float64(1200)) // scale from 1200
-	size, _ := ts.GetSize()
+	var size ts.Size
 
 	t := getTemp()
 	setFanSpeed(1200 + 100*(int(t)-target)) // quickly set it initally
@@ -82,6 +82,7 @@ func cool(target int) {
 		if !chart {
 			fmt.Printf("%v %8v RPM\n", color.YellowString("%.1f C", t), s)
 		} else {
+			size, _ = ts.GetSize()
 			altscr.Do(func() {
 				//fmt.Print("\033[?1049h") // enter alt screen
 				enterAlt()
@@ -89,28 +90,15 @@ func cool(target int) {
 
 			ag.Clear()
 			fmt.Println("Cooling to", color.YellowString("%v C", target))
-			// fmt.Println("\033c") // clear screen
-
+			fmt.Println()
 			tplot = append(tplot, t)
-			//for len(tplot) > 99 { // window width - 1
-			//	tplot = removeKeepOrderFloat(tplot, 0)
-			//}
-			//if !(tplot[0] == float64(target)) {
-			//	tplot = append([]float64{float64(target)}, tplot...) // get 50 value so plot starts from 50
-			//}
-			fmt.Println(ag.Plot(tplot, ag.Height(size.Row()/2), ag.Width(size.Col()), ag.Caption("Temperature (C)")))
+			fmt.Println(ag.Plot(tplot, ag.Height((size.Row()/2)-1-2), ag.Width(size.Col()-7), ag.Caption("Temperature (C)")))
 
 			splot = append(splot, float64(s))
-			//for len(fplot) > 99 { // window width - 1
-			//	fplot = removeKeepOrderFloat(fplot, 0)
-			//}
-			//if !(fplot[0] == 1200) {
-			//	fplot = append([]float64{1200}, fplot...) // get 1200 value so plot scales from 1200
-			//}
-			fmt.Println(ag.Plot(splot, ag.Height(size.Row()/2), ag.Width(size.Col()), ag.Caption("Fan speed (RPM)")))
+			fmt.Println(ag.Plot(splot, ag.Height((size.Row()/2)-1-2), ag.Width(size.Col()-7), ag.Offset(4), ag.Caption("Fan speed (RPM)")))
 			fmt.Printf("Now at %v, %v RPM\n", color.YellowString("%.1f C", t), s)
 		}
-		setFanSpeed(s + 4*(int(t)-target)) // set current to current + 10 times the difference in temps. This will automatically correct when temp is too low.
+		setFanSpeed(s + 4*(int(t)-target)) // set current to current + 4 times the difference in temps. This will automatically correct when temp is too low.
 	}
 }
 
