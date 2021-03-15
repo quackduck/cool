@@ -8,12 +8,14 @@ import (
 	"os/user"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
 	// "github.com/caseymrm/go-smc"
 	"github.com/fatih/color"
 	ag "github.com/guptarohit/asciigraph"
+	"github.com/olekukonko/ts"
 )
 
 var (
@@ -63,46 +65,52 @@ func cool(target int) {
 	go func() {
 		<-c
 		setFanSpeed(1200) // default min fan speed
+		exitAlt()
 		os.Exit(0)
 	}()
-	t := getTemp()
 	var s int
+	altscr := sync.Once{}
+	var tplot, splot []float64
+	splot = append(splot, float64(1200)) // scale from 1200
+	size, _ := ts.GetSize()
 
-	var tplot, fplot []float64
+	t := getTemp()
 	setFanSpeed(1200 + 100*(int(t)-target)) // quickly set it initally
-	for ; ; time.Sleep(time.Second * 5) {   // fine tune
+	for ; ; time.Sleep(time.Second * 2) {   // fine tune
 		s = getFanSpeed()
 		t = getTemp()
-
 		if !chart {
 			fmt.Printf("%v %8v RPM\n", color.YellowString("%.1f C", t), s)
 		} else {
+			altscr.Do(func() {
+				//fmt.Print("\033[?1049h") // enter alt screen
+				enterAlt()
+			})
+
 			ag.Clear()
 			fmt.Println("Cooling to", color.YellowString("%v C", target))
 			// fmt.Println("\033c") // clear screen
 
 			tplot = append(tplot, t)
-			for len(tplot) > 99 { // window width - 1
-				tplot = removeKeepOrderFloat(tplot, 0)
-			}
-			if !(tplot[0] == 50) {
-				tplot = append([]float64{50}, tplot...) // get 50 value so plot starts from 50
-			}
-			fmt.Println(ag.Plot(tplot, ag.Height(8), ag.Caption("Temperature (C)")))
+			//for len(tplot) > 99 { // window width - 1
+			//	tplot = removeKeepOrderFloat(tplot, 0)
+			//}
+			//if !(tplot[0] == float64(target)) {
+			//	tplot = append([]float64{float64(target)}, tplot...) // get 50 value so plot starts from 50
+			//}
+			fmt.Println(ag.Plot(tplot, ag.Height(size.Row()/2), ag.Width(size.Col()), ag.Caption("Temperature (C)")))
 
-			// fmt.Println()
-
-			fplot = append(fplot, float64(s))
-			for len(fplot) > 99 { // window width - 1
-				fplot = removeKeepOrderFloat(fplot, 0)
-			}
-			if !(fplot[0] == 1200) {
-				fplot = append([]float64{1200}, fplot...) // get 1200 value so plot scales from 1200
-			}
-			fmt.Println(ag.Plot(fplot, ag.Height(8), ag.Caption("Fan speed (RPM)")))
+			splot = append(splot, float64(s))
+			//for len(fplot) > 99 { // window width - 1
+			//	fplot = removeKeepOrderFloat(fplot, 0)
+			//}
+			//if !(fplot[0] == 1200) {
+			//	fplot = append([]float64{1200}, fplot...) // get 1200 value so plot scales from 1200
+			//}
+			fmt.Println(ag.Plot(splot, ag.Height(size.Row()/2), ag.Width(size.Col()), ag.Caption("Fan speed (RPM)")))
 			fmt.Printf("Now at %v, %v RPM\n", color.YellowString("%.1f C", t), s)
 		}
-		setFanSpeed(s + 10*(int(t)-target)) // set current to current + 10 times the difference in temps. This will automatically correct when temp is too low.
+		setFanSpeed(s + 4*(int(t)-target)) // set current to current + 10 times the difference in temps. This will automatically correct when temp is too low.
 	}
 }
 
@@ -145,6 +153,24 @@ func run(command string) string {
 		return ""
 	}
 	return string(b)
+}
+
+func enterAlt() {
+	cmd := exec.Command("tput", "smcup")
+	cmd.Stdout = os.Stdout
+	if err := cmd.Run(); err != nil {
+		handleErr(err)
+		return
+	}
+}
+
+func exitAlt() {
+	cmd := exec.Command("tput", "rmcup")
+	cmd.Stdout = os.Stdout
+	if err := cmd.Run(); err != nil {
+		handleErr(err)
+		return
+	}
 }
 
 func argsHaveOption(long string, short string) (hasOption bool, foundAt int) {
