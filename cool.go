@@ -68,14 +68,15 @@ func cool(target float64) {
 	}
 	setupInterrupt()
 	var (
-		speed       int
-		tplot       []float64
-		splot       = []float64{1200} // start at default
-		size        ts.Size
-		temp        = getTemp()
-		printedTime = false
-		g           = color.New(color.FgHiGreen)
-		start       = time.Now()
+		speed                int
+		tplot                []float64
+		splot                = []float64{1200} // start at default
+		termsize             ts.Size
+		temp                 = getTemp()
+		timeTaken            = ""
+		alreadyReachedTarget = false
+		green                = color.New(color.FgHiGreen)
+		start                = time.Now()
 	)
 
 	setFanSpeed(1200 + int(math.Round(150*(temp-target)))) // quickly set it at the start
@@ -84,32 +85,31 @@ func cool(target float64) {
 		temp = getTemp()
 
 		if chart {
-			size, _ = ts.GetSize()
+			termsize, _ = ts.GetSize()
 			termenv.ClearScreen()
-			fmt.Println("Target:", color.YellowString("%v C", target))
+			fmt.Println("Target", color.YellowString("%v °C", target), timeTaken)
 			// fmt.Println()
 
 			tplot = append(tplot, temp)
-			fmt.Println(ag.Plot(tplot, ag.Height((size.Row()/2)-2-2), ag.Width(size.Col()-7), ag.Caption("Temperature (C)")))
+			fmt.Println(ag.Plot(tplot, ag.Height((termsize.Row()/2)-2-2), ag.Width(termsize.Col()-7), ag.Caption("Temperature (C)")))
 
 			splot = append(splot, float64(speed))
-			fmt.Println(ag.Plot(splot, ag.Height((size.Row()/2)-2-2), ag.Width(size.Col()-7), ag.Offset(4), ag.Caption("Fan speed (RPM)")))
+			fmt.Println(ag.Plot(splot, ag.Height((termsize.Row()/2)-2-2), ag.Width(termsize.Col()-7), ag.Offset(4), ag.Caption("Fan speed (RPM)")))
 
-			fmt.Printf("Now at %v, %v RPM\n", color.YellowString("%.1f C", temp), speed)
+			fmt.Printf("Now at %v, %v RPM\n", color.YellowString("%.1f °C", temp), speed)
 			if math.Round(target) == math.Round(temp) { // nolint
-				g.Print("At target")
-				if !printedTime {
-					g.Print(" in " + time.Since(start).Round(time.Second).String())
-					printedTime = true
+				green.Print("At target!")
+				if !alreadyReachedTarget {
+					timeTaken = "reached in " + color.HiGreenString(time.Since(start).Round(time.Second).String())
+					alreadyReachedTarget = true
 				}
-				g.Print("!")
 			} else if target > temp {
 				color.New(color.FgCyan).Print("Cooler than target!")
 			} else {
 				color.New(color.FgRed).Print("Hotter than target")
 			}
 		} else {
-			fmt.Printf("%v %8v RPM\n", color.YellowString("%.1f C", temp), speed)
+			fmt.Printf("%v %8v RPM\n", color.YellowString("%.1f °C", temp), speed)
 		}
 		setFanSpeed(speed + int(math.Round(temp-float64(target)))) // set current to current + the difference in temps. This will automatically correct when temp is too low.
 	}
