@@ -151,7 +151,9 @@ func getTemp() float64 {
 }
 
 func getKey(key string) string {
-	return strings.Fields(strings.TrimSpace(run("smc -r -k " + key)))[2] // format is "   F0Mn  [fpe2]  2400.00 (bytes 25 80)" so we trim, split and return third
+	v := run("smc -r -k " + key)                           // v now has the format: "   F0Mn  [fpe2]  2400.00 (bytes 25 80)"
+	v = strings.TrimSpace(v[strings.LastIndex(v, "]")+1:]) // cut it till the last bracket and trim so it's now "2400.00 (bytes 25 80)"
+	return strings.Fields(v)[0]                            // split by whitespace to get ["2400.00", "(bytes", "25", "80)"] and then return the first value which is what we want
 }
 
 func setKey(key string, value string) {
