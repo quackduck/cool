@@ -61,4 +61,6 @@ brews:
     # Your app's description.
     # Default is empty.
     description: 'Never let kernel_task eat up CPU again.'
-    install: 'bin.install "tii" "smc"'
+    install: |
+      bin.install "tii"
+      bin.install "smc"
