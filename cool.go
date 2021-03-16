@@ -59,13 +59,6 @@ func main() {
 }
 
 func cool(target float64) {
-	//if target > 100 {
-	//	target = 100
-	//}
-	//if target < 20 { // sane limits
-	//	target = 20
-	//}
-
 	// Init:
 	if !chart {
 		fmt.Println("Cooling to", color.YellowString("%v C", target))
@@ -103,7 +96,7 @@ func cool(target float64) {
 			fmt.Println(ag.Plot(splot, ag.Height((size.Row()/2)-2-2), ag.Width(size.Col()-7), ag.Offset(4), ag.Caption("Fan speed (RPM)")))
 
 			fmt.Printf("Now at %v, %v RPM\n", color.YellowString("%.1f C", temp), speed)
-			if math.Round(target) == math.Round(temp) {
+			if math.Round(target) == math.Round(temp) { // nolint
 				g.Print("At target")
 				if !printedTime {
 					g.Print(" in " + time.Since(start).Round(time.Second).String())
@@ -143,7 +136,6 @@ func setFanSpeed(minSpeed int) {
 	if minSpeed < 1200 { // min safe fan speed
 		minSpeed = 1200
 	}
-	//fmt.Println(strconv.FormatInt(int64(minSpeed<<2), 16))
 	setKey("F0Mn", strconv.FormatInt(int64(minSpeed<<2), 16)) // https://github.com/hholtmann/smcFanControl/tree/master/smc-command
 }
 
@@ -177,24 +169,6 @@ func run(command string) string {
 	return string(b)
 }
 
-func enterAlt() {
-	cmd := exec.Command("tput", "smcup")
-	cmd.Stdout = os.Stdout
-	if err := cmd.Run(); err != nil {
-		handleErr(err)
-		return
-	}
-}
-
-func exitAlt() {
-	cmd := exec.Command("tput", "rmcup")
-	cmd.Stdout = os.Stdout
-	if err := cmd.Run(); err != nil {
-		handleErr(err)
-		return
-	}
-}
-
 func argsHaveOption(long string, short string) (hasOption bool, foundAt int) {
 	for i, arg := range os.Args {
 		if arg == "--"+long || arg == "-"+short {
@@ -213,9 +187,5 @@ func handleErrStr(str string) {
 }
 
 func removeKeepOrder(s []string, i int) []string {
-	return append(s[:i], s[i+1:]...)
-}
-
-func removeKeepOrderFloat(s []float64, i int) []float64 {
 	return append(s[:i], s[i+1:]...)
 }
