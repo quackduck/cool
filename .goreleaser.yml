@@ -62,5 +62,5 @@ brews:
     # Default is empty.
     description: 'Never let kernel_task eat up CPU again.'
     install: |
-      bin.install "tii"
+      bin.install "cool"
       bin.install "smc"
