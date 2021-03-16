@@ -1,3 +1,3 @@
 # Cool
 
-Never let kernel_task eat up CPU again.
+Never let the heat slow your Mac down again. 
