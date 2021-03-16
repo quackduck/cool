@@ -2,8 +2,6 @@ name: Goreleaser
 
 on:
   push:
-    tags:
-      - '*'
 
 jobs:
   goreleaser:
