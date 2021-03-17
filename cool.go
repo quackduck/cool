@@ -18,25 +18,35 @@ import (
 	"github.com/olekukonko/ts"
 )
 
+// TODO: auto scrolling
+
 var (
 	version = "dev"
-	helpMsg = ``
-	chart   = true
+	helpMsg = `Cool - Never let the heat slow your Mac down
+Usage: cool [-c/--no-chart] [<temperature>]
+       cool [-h/--help | -v/--version]`
+	chart       = true
+	defaultTemp = 75.0
 )
 
 func main() {
+	if hasOption, i := argsHaveOption("no-chart", "c"); hasOption {
+		chart = false
+		os.Args = removeKeepOrder(os.Args, i)
+		main()
+		return
+	}
+	if len(os.Args) > 2 {
+		handleErrStr("Too many arguments")
+		fmt.Println(helpMsg)
+		return
+	}
 	if hasOption, _ := argsHaveOption("help", "h"); hasOption {
 		fmt.Println(helpMsg)
 		return
 	}
 	if hasOption, _ := argsHaveOption("version", "v"); hasOption {
 		fmt.Println("Cool " + version)
-		return
-	}
-	if hasOption, i := argsHaveOption("no-chart", "c"); hasOption {
-		chart = false
-		os.Args = removeKeepOrder(os.Args, i)
-		main()
 		return
 	}
 	currentUser, err := user.Current()
@@ -48,7 +58,7 @@ func main() {
 		return
 	}
 	if len(os.Args) == 1 {
-		cool(75)
+		cool(defaultTemp)
 	}
 	temp, err := strconv.ParseFloat(os.Args[1], 32)
 	if err != nil {
@@ -69,49 +79,74 @@ func cool(target float64) {
 	setupInterrupt()
 	var (
 		speed                int
-		tplot                []float64
-		splot                = []float64{1200} // start at default
 		termsize             ts.Size
 		temp                 = getTemp()
 		timeTaken            = ""
 		alreadyReachedTarget = false
 		green                = color.New(color.FgHiGreen)
+		cyan                 = color.New(color.FgCyan)
+		yellow               = color.New(color.FgHiYellow)
 		start                = time.Now()
+		tplot                []float64
+		splot                = []float64{float64(getFanSpeed())} // start at current because we'll change it soon
+		lastTemp             = temp
+		arrLengthLim         = 1000 // we'll keep an array limit so the values "scroll"
 	)
 
 	setFanSpeed(1200 + int(math.Round(150*(temp-target)))) // quickly set it at the start
 	for ; ; time.Sleep(time.Second * 2) {                  // fine tuning
 		speed = getFanSpeed()
+		lastTemp = temp
 		temp = getTemp()
 
 		if chart {
 			termsize, _ = ts.GetSize()
 			termenv.ClearScreen()
-			fmt.Println("Target", color.YellowString("%v °C", target), timeTaken)
+			fmt.Println("Target", color.HiGreenString("%v °C", target), timeTaken)
 			// fmt.Println()
 
 			tplot = append(tplot, temp)
+			if len(tplot) > arrLengthLim {
+				tplot = tplot[len(tplot)-arrLengthLim:] // cut off the front so we have max 100 vals
+			}
 			fmt.Println(ag.Plot(tplot, ag.Height((termsize.Row()/2)-2-2), ag.Width(termsize.Col()-7), ag.Caption("Temperature (C)")))
 
 			splot = append(splot, float64(speed))
+			if len(splot) > arrLengthLim {
+				splot = splot[len(splot)-arrLengthLim:]
+			}
 			fmt.Println(ag.Plot(splot, ag.Height((termsize.Row()/2)-2-2), ag.Width(termsize.Col()-7), ag.Offset(4), ag.Caption("Fan speed (RPM)")))
 
-			fmt.Printf("Now at %v, %v RPM\n", color.YellowString("%.1f °C", temp), speed)
 			if math.Round(target) == math.Round(temp) { // nolint
-				green.Print("At target!")
+				green.Print("·")
+				fmt.Println(" At target!")
 				if !alreadyReachedTarget {
 					timeTaken = "reached in " + color.HiGreenString(time.Since(start).Round(time.Second).String())
 					alreadyReachedTarget = true
 				}
 			} else if target > temp {
-				color.New(color.FgCyan).Print("Cooler than target!")
+				cyan.Print("↓")
+				fmt.Println(" Cooler than target!")
 			} else {
-				color.New(color.FgRed).Print("Hotter than target")
+				yellow.Print("↑")
+				fmt.Println(" Hotter than target")
 			}
+
+			if lastTemp == temp { // nolint
+				green.Print("·")
+				fmt.Println(" Temperature is stable")
+			} else if lastTemp > temp {
+				cyan.Print("↓")
+				fmt.Println(" Temperature is decreasing")
+			} else {
+				yellow.Print("↑")
+				fmt.Println(" Temperature is increasing")
+			}
+			fmt.Printf("Now at %.1f °C %v RPM %v\n", temp, speed, time.Since(start).Round(time.Second))
 		} else {
-			fmt.Printf("%v %8v RPM\n", color.YellowString("%.1f °C", temp), speed)
+			fmt.Printf("Now at %.1f °C %v RPM", temp, speed)
 		}
-		setFanSpeed(speed + int(math.Round(temp-float64(target)))) // set current to current + the difference in temps. This will automatically correct when temp is too low.
+		setFanSpeed(speed + int(math.Round(temp-target))) // set current to current + the difference in temps. This will automatically correct when temp is too low.
 	}
 }
 
@@ -190,4 +225,8 @@ func handleErrStr(str string) {
 
 func removeKeepOrder(s []string, i int) []string {
 	return append(s[:i], s[i+1:]...)
+}
+
+func removefirstn(s []float64, n int) []float64 {
+	return s[n:] // 0, 1, 2, 3, 4
 }
