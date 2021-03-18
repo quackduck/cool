@@ -18,8 +18,6 @@ import (
 	"github.com/olekukonko/ts"
 )
 
-// TODO: auto scrolling
-
 var (
 	version = "dev"
 	helpMsg = `Cool - Never let the heat slow your Mac down
@@ -103,7 +101,6 @@ func cool(target float64) {
 			termsize, _ = ts.GetSize()
 			termenv.ClearScreen()
 			fmt.Println("Target", color.HiGreenString("%v °C", target), timeTaken)
-			// fmt.Println()
 
 			tplot = append(tplot, temp)
 			if len(tplot) > arrLengthLim {
@@ -142,7 +139,7 @@ func cool(target float64) {
 				yellow.Print("↑")
 				fmt.Println(" Temperature is increasing")
 			}
-			fmt.Printf("Now at %.1f °C %v RPM %v\n", temp, speed, time.Since(start).Round(time.Second))
+			fmt.Printf("Now at %.1f °C %v RPM Time: %v", temp, speed, time.Since(start).Round(time.Second))
 		} else {
 			fmt.Printf("Now at %.1f °C %v RPM", temp, speed)
 		}
@@ -225,8 +222,4 @@ func handleErrStr(str string) {
 
 func removeKeepOrder(s []string, i int) []string {
 	return append(s[:i], s[i+1:]...)
-}
-
-func removefirstn(s []float64, n int) []float64 {
-	return s[n:] // 0, 1, 2, 3, 4
 }
