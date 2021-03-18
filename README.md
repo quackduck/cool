@@ -2,6 +2,8 @@
 
 Never let the heat slow your Mac down again. 
 
+Note: Cool is still in beta because I've heard of some possible bugs. Cool is still perfectly safe and can cause no damage (the absolute worst case is that you have to reset the SMC).
+
 Cool is a fan control CLI that lets you cool your CPU to any temperature you'd like. Cool also displays a chart of the temperature changes, a chart of fan speed changes and much more. It reduced the CPU temperature from 97 to 75 in just 1 minute and 10 seconds on a MacBook Air 2017. 
 
 [![asciicast](https://asciinema.org/a/400179.svg)](https://asciinema.org/a/400179?speed=2)
