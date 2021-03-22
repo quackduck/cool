@@ -76,74 +76,75 @@ func cool(target float64) {
 	}
 	setupInterrupt()
 	var (
-		speed                int
-		termsize             ts.Size
+		fanSpeed             int
+		termsize, _          = ts.GetSize()
 		temp                 = getTemp()
 		timeTaken            = ""
 		alreadyReachedTarget = false
 		green                = color.New(color.FgHiGreen)
+		greenDot             = green.Sprint("·")
 		cyan                 = color.New(color.FgCyan)
+		cyanDown             = cyan.Sprint("↓")
 		yellow               = color.New(color.FgHiYellow)
+		yellowUp             = yellow.Sprint("↑")
 		start                = time.Now()
 		tplot                []float64
 		splot                = []float64{float64(getFanSpeed())} // start at current because we'll change it soon
 		lastTemp             = temp
 		arrLengthLim         = 1000 // we'll keep an array limit so the values "scroll"
+		screen               string
+		statusFmt            = "Now at %.1f °C %v RPM Time: %v"
 	)
 
 	setFanSpeed(1200 + int(math.Round(150*(temp-target)))) // quickly set it at the start
 	for ; ; time.Sleep(time.Second * 2) {                  // fine tuning
-		speed = getFanSpeed()
+		fanSpeed = getFanSpeed()
 		lastTemp = temp
 		temp = getTemp()
 
 		if chart {
-			termsize, _ = ts.GetSize()
-			termenv.ClearScreen()
-			fmt.Println("Target", color.HiGreenString("%v °C", target), timeTaken)
+			screen = ""
+			screen += "Target " + green.Sprintf("%v °C", target) + timeTaken + "\n"
 
 			tplot = append(tplot, temp)
 			if len(tplot) > arrLengthLim {
 				tplot = tplot[len(tplot)-arrLengthLim:] // cut off the front so we have max 100 vals
 			}
-			fmt.Println(ag.Plot(tplot, ag.Height((termsize.Row()/2)-2-2), ag.Width(termsize.Col()-7), ag.Caption("Temperature (C)")))
+			screen += ag.Plot(tplot, ag.Height((termsize.Row()/2)-4), ag.Width(termsize.Col()-7), ag.Caption("Temperature (C)")) + "\n"
 
-			splot = append(splot, float64(speed))
+			splot = append(splot, float64(fanSpeed))
 			if len(splot) > arrLengthLim {
 				splot = splot[len(splot)-arrLengthLim:]
 			}
-			fmt.Println(ag.Plot(splot, ag.Height((termsize.Row()/2)-2-2), ag.Width(termsize.Col()-7), ag.Offset(4), ag.Caption("Fan speed (RPM)")))
+			screen += ag.Plot(splot, ag.Height((termsize.Row()/2)-4), ag.Width(termsize.Col()-7), ag.Offset(4), ag.Caption("Fan speed (RPM)")) + "\n"
 
 			if math.Round(target) == math.Round(temp) { // nolint
-				green.Print("·")
-				fmt.Println(" At target!")
+				screen += greenDot + " Reached target!\n"
 				if !alreadyReachedTarget {
 					timeTaken = "reached in " + color.HiGreenString(time.Since(start).Round(time.Second).String())
 					alreadyReachedTarget = true
 				}
 			} else if target > temp {
-				cyan.Print("↓")
-				fmt.Println(" Cooler than target!")
+				screen += cyanDown + " Cooler than target!\n"
 			} else {
-				yellow.Print("↑")
-				fmt.Println(" Hotter than target")
+				screen += yellowUp + " Hotter than target\n"
 			}
 
 			if lastTemp == temp { // nolint
-				green.Print("·")
-				fmt.Println(" Temperature is stable")
+				screen += greenDot + " Temperature is stable\n"
 			} else if lastTemp > temp {
-				cyan.Print("↓")
-				fmt.Println(" Temperature is decreasing")
+				screen += cyanDown + " Temperature is decreasing\n"
 			} else {
-				yellow.Print("↑")
-				fmt.Println(" Temperature is increasing")
+				screen += yellowUp + " Temperature is increasing\n"
 			}
-			fmt.Printf("Now at %.1f °C %v RPM Time: %v", temp, speed, time.Since(start).Round(time.Second))
+			screen += fmt.Sprintf(statusFmt, temp, fanSpeed, time.Since(start).Round(time.Second))
+			termsize, _ = ts.GetSize()
+			termenv.ClearScreen()
+			fmt.Print(screen)
 		} else {
-			fmt.Printf("Now at %.1f °C %v RPM", temp, speed)
+			screen += fmt.Sprintf(statusFmt, temp, fanSpeed, time.Since(start).Round(time.Second))
 		}
-		setFanSpeed(speed + int(math.Round(temp-target))) // set current to current + the difference in temps. This will automatically correct when temp is too low.
+		setFanSpeed(fanSpeed + int(math.Round(temp-target))) // set current to current + the difference in temps. This will automatically correct when temp is too low.
 	}
 }
 
@@ -176,9 +177,9 @@ func getFanSpeed() int {
 	return int(s)
 }
 
-// getTemp returns the value of the SMC's CPU 1 sensor (Celsius)
+// getTemp returns the value of the SMC's CPU PECI Die filtered and adjusted temp for fan/power control in Celsius
 func getTemp() float64 {
-	t, _ := strconv.ParseFloat(getKey("TC0E"), 64)
+	t, _ := strconv.ParseFloat(getKey("TC0F"), 64)
 	return t
 }
 
