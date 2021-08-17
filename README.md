@@ -25,6 +25,12 @@ or let Cool choose the default (75 C)
 sudo cool
 ```
 
+## Install
+```shell
+brew install quackduck/tap/cool
+```
+or get an executable from [releases](https://github.com/quackduck/cool/releases)
+
 ## FAQ
 
 **Isn't fan control bad for your Mac?**  

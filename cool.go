@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
 	"math"
 	"os"
@@ -25,6 +26,8 @@ Usage: cool [-c/--no-chart] [<temperature>]
        cool [-h/--help | -v/--version]`
 	chart       = true
 	defaultTemp = 75.0
+
+	fanKeyEncodingIsFLT = getFanIsFLT()
 )
 
 func main() {
@@ -169,8 +172,21 @@ func setFanSpeed(minSpeed int) {
 	if minSpeed < 1200 { // min safe fan speed
 		minSpeed = 1200
 	}
+	//math.Float32frombits(binary.LittleEndian.Uint32([]byte{0x00, 0x40, 0x9c, 0x44})) // YES IT PRINTS 1250
+	//math.Float32frombits(binary.LittleEndian.Uint32([]byte{0x00, 0x40, 0x9c, 0x44}))
+	if fanKeyEncodingIsFLT {
+		setKey("F0Mn", fmt.Sprintf("%x", float32ToBytes(float32(minSpeed))))
+		return
+	}
 	setKey("F0Mn", strconv.FormatInt(int64(minSpeed<<2), 16)) // https://github.com/hholtmann/smcFanControl/tree/master/smc-command
 }
+
+func float32ToBytes(f float32) []byte {
+	var buf [4]byte
+	binary.LittleEndian.PutUint32(buf[:], math.Float32bits(f))
+	return buf[:]
+}
+
 
 func getFanSpeed() int {
 	s, _ := strconv.ParseFloat(getKey("F0Mn"), 64) // get min fan speed (shouldn't change target)
@@ -187,6 +203,11 @@ func getKey(key string) string {
 	v := run("smc -r -k " + key)                           // v now has the format: "   F0Mn  [fpe2]  2400.00 (bytes 25 80)"
 	v = strings.TrimSpace(v[strings.LastIndex(v, "]")+1:]) // cut it till the last bracket and trim so it's now "2400.00 (bytes 25 80)"
 	return strings.Fields(v)[0]                            // split by whitespace to get ["2400.00", "(bytes", "25", "80)"] and then return the first value which is what we want
+}
+
+func getFanIsFLT() bool {
+	v := run("smc -r -k F0Mn")
+	return strings.Contains(v, "[flt ]")
 }
 
 func setKey(key string, value string) {
